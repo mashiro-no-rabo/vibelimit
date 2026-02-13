@@ -212,7 +212,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Build menu
         let menu = NSMenu()
 
-        fiveHourItem = NSMenuItem(title: "5h: ---%", action: nil, keyEquivalent: "")
+        fiveHourItem = NSMenuItem(title: "Current Session: ---%", action: nil, keyEquivalent: "")
         fiveHourItem.isEnabled = false
         menu.addItem(fiveHourItem)
 
@@ -265,10 +265,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.nyanView.progress = min(max(util, 0), 1)
 
                 // Update menu items
-                self.fiveHourItem.title = String(format: "5h: %.0f%%", usage.fiveHour.utilization)
+                self.fiveHourItem.title = String(format: "Current Session: %.0f%%", usage.fiveHour.utilization)
                 self.fiveHourResetItem.title = "  Resets in: \(formatTimeUntil(usage.fiveHour.resetsAt))"
                 self.sevenDayItem.title = String(format: "Weekly: %.0f%%", usage.sevenDay.utilization)
-                self.sevenDayResetItem.title = "  Resets in: \(formatTimeUntil(usage.sevenDay.resetsAt))"
+                let resetFmt = DateFormatter()
+                resetFmt.dateFormat = "yyyy-MM-dd HH:mm"
+                self.sevenDayResetItem.title = "  Resets at: \(resetFmt.string(from: usage.sevenDay.resetsAt))"
             }
         }
     }

@@ -22,6 +22,8 @@ macOS menu bar app that shows Claude usage as a pikanyan nyan cat progress bar.
 Package.swift                              # SPM manifest
 Sources/VibeLimitApp/main.swift            # All app code (single file)
 Sources/VibeLimitApp/Resources/pikanyan.gif # Animated gif from vscode-nyan-cat
+com.vibelimit.app.plist                    # LaunchAgent plist for launchctl
+README.md                                  # Build & launch setup docs
 .gitignore
 ```
 
@@ -56,6 +58,15 @@ Sources/VibeLimitApp/Resources/pikanyan.gif # Animated gif from vscode-nyan-cat
 swift build
 .build/debug/VibeLimitApp &
 ```
+
+### LaunchAgent (run via launchctl)
+
+```sh
+cp com.vibelimit.app.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.vibelimit.app.plist
+```
+
+To stop: `launchctl unload ~/Library/LaunchAgents/com.vibelimit.app.plist`
 
 ## Pikanyan gif
 
