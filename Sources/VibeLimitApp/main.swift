@@ -144,7 +144,9 @@ class NyanProgressView: NSView {
         let scale = catHeight / imgSize.height
         let catWidth: CGFloat = imgSize.width * scale
 
-        let catX = progress * (bounds.width - catWidth)
+        // At 0%, clip just the tail (left ~35% of the gif), not the whole cat
+        let tailClip: CGFloat = catWidth * 0.35
+        let catX = progress * (bounds.width - catWidth + tailClip) - tailClip
         let catY: CGFloat = 0
 
         // Draw the rainbow trail by stretching the leftmost 1px column of the gif
@@ -195,7 +197,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var sevenDayResetItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let barWidth: CGFloat = 100
+        let barWidth: CGFloat = 150
 
         statusItem = NSStatusBar.system.statusItem(withLength: barWidth)
 
@@ -213,21 +215,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
 
         fiveHourItem = NSMenuItem(title: "Current Session: ---%", action: nil, keyEquivalent: "")
-        fiveHourItem.isEnabled = false
+
         menu.addItem(fiveHourItem)
 
         fiveHourResetItem = NSMenuItem(title: "  Resets in: ---", action: nil, keyEquivalent: "")
-        fiveHourResetItem.isEnabled = false
+
         menu.addItem(fiveHourResetItem)
 
         menu.addItem(NSMenuItem.separator())
 
         sevenDayItem = NSMenuItem(title: "Weekly: ---%", action: nil, keyEquivalent: "")
-        sevenDayItem.isEnabled = false
+
         menu.addItem(sevenDayItem)
 
         sevenDayResetItem = NSMenuItem(title: "  Resets in: ---", action: nil, keyEquivalent: "")
-        sevenDayResetItem.isEnabled = false
+
         menu.addItem(sevenDayResetItem)
 
         menu.addItem(NSMenuItem.separator())

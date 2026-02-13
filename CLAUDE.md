@@ -46,9 +46,9 @@ README.md                                  # Build & launch setup docs
 - The keychain entry is a JSON blob; token is at `claudeAiOauth.accessToken`
 
 ### Menu bar view
-- NSStatusItem with length 100px
+- NSStatusItem with length 150px
 - Custom NyanProgressView added as subview of statusItem.button
-- Cat position: `progress * (bounds.width - catWidth)` — ensures the cat is always fully visible
+- Cat position: at 0% the tail (~35% of gif) is clipped off the left edge; at 100% the full cat sits at the right edge
 - Rainbow trail: leftmost 1px column of the gif stretched horizontally behind the cat
 - No dock icon: `app.setActivationPolicy(.accessory)`
 
@@ -65,6 +65,8 @@ swift build
 cp com.vibelimit.app.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.vibelimit.app.plist
 ```
+
+To reload after a build: `launchctl unload ~/Library/LaunchAgents/com.vibelimit.app.plist && launchctl load ~/Library/LaunchAgents/com.vibelimit.app.plist`
 
 To stop: `launchctl unload ~/Library/LaunchAgents/com.vibelimit.app.plist`
 
