@@ -213,6 +213,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Build menu
         let menu = NSMenu()
+        menu.autoenablesItems = false
 
         fiveHourItem = NSMenuItem(title: "Current Session: ---%", action: nil, keyEquivalent: "")
 
