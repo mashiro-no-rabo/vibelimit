@@ -8,7 +8,7 @@ macOS menu bar app that shows Claude usage as a pikanyan nyan cat progress bar.
 - The cat's position represents 5-hour session utilization (0–100%)
 - Rainbow trail (stretched from the gif's left edge) fills behind the cat
 - Click the menu bar item to see: session/weekly usage % with ▰▱ progress bars, session resets in h/m, weekly resets in days
-- Usage refreshes every 60 seconds from the API
+- Usage refreshes every 60 seconds and on menu open
 
 ## Tech stack
 

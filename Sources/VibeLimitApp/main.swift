@@ -226,7 +226,7 @@ func formatDaysUntil(_ date: Date) -> String {
 
 // MARK: - App Delegate
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var statusItem: NSStatusItem!
     var nyanView: NyanProgressView!
     var animationTimer: Timer?
@@ -290,8 +290,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(sevenDayResetItem)
 
         menu.addItem(NSMenuItem.separator())
+
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
+        menu.delegate = self
         statusItem.menu = menu
 
         // Read token and fetch usage
@@ -299,9 +301,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         refreshUsage()
 
         // Refresh usage every 60 seconds
-        usageTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+        usageTimer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
             self?.refreshUsage()
         }
+        usageTimer?.tolerance = 5
+        RunLoop.current.add(usageTimer!, forMode: .common)
 
         // Animation timer at ~30fps
         animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
@@ -309,6 +313,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.nyanView.advanceFrame(dt: 1.0 / 30.0)
             self.nyanView.needsDisplay = true
         }
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        refreshUsage()
     }
 
     func refreshUsage() {
