@@ -200,6 +200,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let barWidth: CGFloat = 150
 
         statusItem = NSStatusBar.system.statusItem(withLength: barWidth)
+        statusItem.autosaveName = "!VibeLimitNyanCat"
 
         guard let button = statusItem.button else { return }
 
