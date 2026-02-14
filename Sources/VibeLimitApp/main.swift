@@ -179,6 +179,27 @@ func styledMenuTitle(_ text: String) -> NSAttributedString {
     return NSAttributedString(string: text, attributes: [.font: font])
 }
 
+let menuContentWidth: CGFloat = 150
+
+func makeMenuItemView(_ attributedString: NSAttributedString) -> NSView {
+    let view = NSView(frame: NSRect(x: 0, y: 0, width: menuContentWidth, height: 20))
+    let textField = NSTextField(labelWithAttributedString: attributedString)
+    textField.frame = NSRect(x: 14, y: 0, width: menuContentWidth - 28, height: 20)
+    textField.lineBreakMode = .byTruncatingTail
+    view.addSubview(textField)
+    return view
+}
+
+func makeMenuItemView(_ text: String) -> NSView {
+    let view = NSView(frame: NSRect(x: 0, y: 0, width: menuContentWidth, height: 20))
+    let textField = NSTextField(labelWithString: text)
+    textField.font = NSFont.menuFont(ofSize: 0)
+    textField.frame = NSRect(x: 14, y: 0, width: menuContentWidth - 28, height: 20)
+    textField.lineBreakMode = .byTruncatingTail
+    view.addSubview(textField)
+    return view
+}
+
 // MARK: - Time Formatting
 
 func formatTimeUntil(_ date: Date) -> String {
@@ -214,8 +235,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var oauthToken: String?
 
     // Menu items we update dynamically
+    var fiveHourBarItem: NSMenuItem!
     var fiveHourItem: NSMenuItem!
     var fiveHourResetItem: NSMenuItem!
+    var sevenDayBarItem: NSMenuItem!
     var sevenDayItem: NSMenuItem!
     var sevenDayResetItem: NSMenuItem!
 
@@ -238,25 +261,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Build menu
         let menu = NSMenu()
         menu.autoenablesItems = false
+        menu.minimumWidth = menuContentWidth
 
-        fiveHourItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        fiveHourItem.attributedTitle = styledMenuTitle("Session: ---% ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱")
+        fiveHourBarItem = NSMenuItem()
+        fiveHourBarItem.view = makeMenuItemView(styledMenuTitle(asciiProgressBar(0, width: 15)))
+        menu.addItem(fiveHourBarItem)
 
+        fiveHourItem = NSMenuItem()
+        fiveHourItem.view = makeMenuItemView("Session: ---%")
         menu.addItem(fiveHourItem)
 
-        fiveHourResetItem = NSMenuItem(title: "Resets in ---", action: nil, keyEquivalent: "")
-
+        fiveHourResetItem = NSMenuItem()
+        fiveHourResetItem.view = makeMenuItemView("Resets in ---")
         menu.addItem(fiveHourResetItem)
 
         menu.addItem(NSMenuItem.separator())
 
-        sevenDayItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        sevenDayItem.attributedTitle = styledMenuTitle("Weekly:  ---% ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱")
+        sevenDayBarItem = NSMenuItem()
+        sevenDayBarItem.view = makeMenuItemView(styledMenuTitle(asciiProgressBar(0, width: 15)))
+        menu.addItem(sevenDayBarItem)
 
+        sevenDayItem = NSMenuItem()
+        sevenDayItem.view = makeMenuItemView("Weekly: ---%")
         menu.addItem(sevenDayItem)
 
-        sevenDayResetItem = NSMenuItem(title: "Resets in ---", action: nil, keyEquivalent: "")
-
+        sevenDayResetItem = NSMenuItem()
+        sevenDayResetItem.view = makeMenuItemView("Resets in ---")
         menu.addItem(sevenDayResetItem)
 
         menu.addItem(NSMenuItem.separator())
@@ -294,10 +324,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.nyanView.progress = min(max(util, 0), 1)
 
                 // Update menu items
-                self.fiveHourItem.attributedTitle = styledMenuTitle(String(format: "Session: %3.0f%% \(asciiProgressBar(usage.fiveHour.utilization))", usage.fiveHour.utilization))
-                self.fiveHourResetItem.title = "Resets in \(formatTimeUntil(usage.fiveHour.resetsAt))"
-                self.sevenDayItem.attributedTitle = styledMenuTitle(String(format: "Weekly:  %3.0f%% \(asciiProgressBar(usage.sevenDay.utilization))", usage.sevenDay.utilization))
-                self.sevenDayResetItem.title = "Resets in \(formatDaysUntil(usage.sevenDay.resetsAt))"
+                self.fiveHourBarItem.view = makeMenuItemView(styledMenuTitle(asciiProgressBar(usage.fiveHour.utilization, width: 15)))
+                self.fiveHourItem.view = makeMenuItemView(String(format: "Session: %.0f%%", usage.fiveHour.utilization))
+                self.fiveHourResetItem.view = makeMenuItemView("Resets in \(formatTimeUntil(usage.fiveHour.resetsAt))")
+                self.sevenDayBarItem.view = makeMenuItemView(styledMenuTitle(asciiProgressBar(usage.sevenDay.utilization, width: 15)))
+                self.sevenDayItem.view = makeMenuItemView(String(format: "Weekly: %.0f%%", usage.sevenDay.utilization))
+                self.sevenDayResetItem.view = makeMenuItemView("Resets in \(formatDaysUntil(usage.sevenDay.resetsAt))")
             }
         }
     }
