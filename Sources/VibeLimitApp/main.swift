@@ -174,6 +174,11 @@ func asciiProgressBar(_ percent: Double, width: Int = 20) -> String {
     return String(repeating: "▰", count: filled) + String(repeating: "▱", count: empty)
 }
 
+func styledMenuTitle(_ text: String) -> NSAttributedString {
+    let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+    return NSAttributedString(string: text, attributes: [.font: font])
+}
+
 // MARK: - Time Formatting
 
 func formatTimeUntil(_ date: Date) -> String {
@@ -234,7 +239,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        fiveHourItem = NSMenuItem(title: "Session: ---% ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱", action: nil, keyEquivalent: "")
+        fiveHourItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        fiveHourItem.attributedTitle = styledMenuTitle("Session: ---% ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱")
 
         menu.addItem(fiveHourItem)
 
@@ -244,7 +250,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        sevenDayItem = NSMenuItem(title: "Weekly:  ---% ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱", action: nil, keyEquivalent: "")
+        sevenDayItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        sevenDayItem.attributedTitle = styledMenuTitle("Weekly:  ---% ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱")
 
         menu.addItem(sevenDayItem)
 
@@ -287,9 +294,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.nyanView.progress = min(max(util, 0), 1)
 
                 // Update menu items
-                self.fiveHourItem.title = String(format: "Session: %3.0f%% \(asciiProgressBar(usage.fiveHour.utilization))", usage.fiveHour.utilization)
+                self.fiveHourItem.attributedTitle = styledMenuTitle(String(format: "Session: %3.0f%% \(asciiProgressBar(usage.fiveHour.utilization))", usage.fiveHour.utilization))
                 self.fiveHourResetItem.title = "Resets in \(formatTimeUntil(usage.fiveHour.resetsAt))"
-                self.sevenDayItem.title = String(format: "Weekly:  %3.0f%% \(asciiProgressBar(usage.sevenDay.utilization))", usage.sevenDay.utilization)
+                self.sevenDayItem.attributedTitle = styledMenuTitle(String(format: "Weekly:  %3.0f%% \(asciiProgressBar(usage.sevenDay.utilization))", usage.sevenDay.utilization))
                 self.sevenDayResetItem.title = "Resets in \(formatDaysUntil(usage.sevenDay.resetsAt))"
             }
         }
