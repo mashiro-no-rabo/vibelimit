@@ -165,6 +165,15 @@ class NyanProgressView: NSView {
     }
 }
 
+// MARK: - ASCII Progress Bar
+
+func asciiProgressBar(_ percent: Double, width: Int = 20) -> String {
+    let clamped = min(max(percent, 0), 100)
+    let filled = Int(round(clamped / 100.0 * Double(width)))
+    let empty = width - filled
+    return String(repeating: "▰", count: filled) + String(repeating: "▱", count: empty)
+}
+
 // MARK: - Time Formatting
 
 func formatTimeUntil(_ date: Date) -> String {
@@ -178,6 +187,15 @@ func formatTimeUntil(_ date: Date) -> String {
         return "\(hours)h \(minutes)m"
     }
     return "\(minutes)m"
+}
+
+func formatDaysUntil(_ date: Date) -> String {
+    let interval = date.timeIntervalSinceNow
+    if interval <= 0 { return "now" }
+
+    let days = Int(ceil(interval / 86400))
+    if days == 1 { return "1 day" }
+    return "\(days) days"
 }
 
 // MARK: - App Delegate
@@ -216,21 +234,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        fiveHourItem = NSMenuItem(title: "Current Session: ---%", action: nil, keyEquivalent: "")
+        fiveHourItem = NSMenuItem(title: "Session: ---% ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱", action: nil, keyEquivalent: "")
 
         menu.addItem(fiveHourItem)
 
-        fiveHourResetItem = NSMenuItem(title: "  Resets in: ---", action: nil, keyEquivalent: "")
+        fiveHourResetItem = NSMenuItem(title: "Resets in ---", action: nil, keyEquivalent: "")
 
         menu.addItem(fiveHourResetItem)
 
         menu.addItem(NSMenuItem.separator())
 
-        sevenDayItem = NSMenuItem(title: "Weekly: ---%", action: nil, keyEquivalent: "")
+        sevenDayItem = NSMenuItem(title: "Weekly:  ---% ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱", action: nil, keyEquivalent: "")
 
         menu.addItem(sevenDayItem)
 
-        sevenDayResetItem = NSMenuItem(title: "  Resets in: ---", action: nil, keyEquivalent: "")
+        sevenDayResetItem = NSMenuItem(title: "Resets in ---", action: nil, keyEquivalent: "")
 
         menu.addItem(sevenDayResetItem)
 
@@ -269,12 +287,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.nyanView.progress = min(max(util, 0), 1)
 
                 // Update menu items
-                self.fiveHourItem.title = String(format: "Current Session: %.0f%%", usage.fiveHour.utilization)
-                self.fiveHourResetItem.title = "  Resets in: \(formatTimeUntil(usage.fiveHour.resetsAt))"
-                self.sevenDayItem.title = String(format: "Weekly: %.0f%%", usage.sevenDay.utilization)
-                let resetFmt = DateFormatter()
-                resetFmt.dateFormat = "yyyy-MM-dd HH:mm"
-                self.sevenDayResetItem.title = "  Resets at: \(resetFmt.string(from: usage.sevenDay.resetsAt))"
+                self.fiveHourItem.title = String(format: "Session: %3.0f%% \(asciiProgressBar(usage.fiveHour.utilization))", usage.fiveHour.utilization)
+                self.fiveHourResetItem.title = "Resets in \(formatTimeUntil(usage.fiveHour.resetsAt))"
+                self.sevenDayItem.title = String(format: "Weekly:  %3.0f%% \(asciiProgressBar(usage.sevenDay.utilization))", usage.sevenDay.utilization)
+                self.sevenDayResetItem.title = "Resets in \(formatDaysUntil(usage.sevenDay.resetsAt))"
             }
         }
     }

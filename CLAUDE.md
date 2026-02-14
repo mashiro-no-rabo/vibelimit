@@ -7,7 +7,7 @@ macOS menu bar app that shows Claude usage as a pikanyan nyan cat progress bar.
 - Displays an animated pikanyan gif in the macOS menu bar as a progress bar
 - The cat's position represents 5-hour session utilization (0–100%)
 - Rainbow trail (stretched from the gif's left edge) fills behind the cat
-- Click the menu bar item to see: 5h usage %, 5h reset time, weekly usage %, weekly reset time
+- Click the menu bar item to see: session/weekly usage % with ▰▱ progress bars, session resets in h/m, weekly resets in days
 - Usage refreshes every 60 seconds from the API
 
 ## Tech stack
@@ -67,6 +67,8 @@ launchctl load ~/Library/LaunchAgents/com.vibelimit.app.plist
 ```
 
 To reload after a build: `launchctl unload ~/Library/LaunchAgents/com.vibelimit.app.plist && launchctl load ~/Library/LaunchAgents/com.vibelimit.app.plist`
+
+**Always reload the app after building.**
 
 To stop: `launchctl unload ~/Library/LaunchAgents/com.vibelimit.app.plist`
 
