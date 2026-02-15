@@ -9,6 +9,7 @@ macOS menu bar app that shows Claude usage as a pikanyan nyan cat progress bar.
 - Rainbow trail (stretched from the gif's left edge) fills behind the cat
 - Click the menu bar item to see: session/weekly usage % with ▰▱ progress bars, session resets in h/m, weekly resets in days
 - Usage refreshes every 60 seconds and on menu open
+- On auth/token errors, shows a "Run: claude auth login" menu item that opens Terminal to run the command
 
 ## Tech stack
 
@@ -39,6 +40,8 @@ README.md                                  # Build & launch setup docs
 - Header: `Authorization: Bearer <token>`, `anthropic-beta: oauth-2025-04-20`
 - Response: `{ "five_hour": { "utilization": 37.0, "resets_at": "..." }, "seven_day": { ... } }`
 - Utilization is a percentage (0–100), resets_at is ISO 8601 with fractional seconds
+- Error handling: 401/403 → auth error (prompts login), network errors and parse errors shown in menu
+- On auth error, cached token is cleared; next refresh re-reads from keychain to auto-recover after login
 
 ### OAuth token
 - Read from macOS Keychain via `/usr/bin/security find-generic-password -s "Claude Code-credentials" -w`

@@ -66,9 +66,20 @@ func readOAuthToken() -> String? {
     return token
 }
 
-func fetchUsage(token: String, completion: @escaping (UsageData?) -> Void) {
+enum UsageError {
+    case authError
+    case networkError
+    case parseError
+}
+
+enum UsageResult {
+    case success(UsageData)
+    case failure(UsageError)
+}
+
+func fetchUsage(token: String, completion: @escaping (UsageResult) -> Void) {
     guard let url = URL(string: "https://api.anthropic.com/api/oauth/usage") else {
-        completion(nil)
+        completion(.failure(.networkError))
         return
     }
 
@@ -79,7 +90,18 @@ func fetchUsage(token: String, completion: @escaping (UsageData?) -> Void) {
     let isoFormatter = ISO8601DateFormatter()
     isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
-    URLSession.shared.dataTask(with: request) { data, _, _ in
+    URLSession.shared.dataTask(with: request) { data, response, error in
+        if error != nil {
+            completion(.failure(.networkError))
+            return
+        }
+
+        if let httpResponse = response as? HTTPURLResponse,
+           httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+            completion(.failure(.authError))
+            return
+        }
+
         guard let data = data,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let fiveHour = json["five_hour"] as? [String: Any],
@@ -91,14 +113,14 @@ func fetchUsage(token: String, completion: @escaping (UsageData?) -> Void) {
               let fiveDate = isoFormatter.date(from: fiveReset),
               let sevenDate = isoFormatter.date(from: sevenReset)
         else {
-            completion(nil)
+            completion(.failure(.parseError))
             return
         }
 
-        completion(UsageData(
+        completion(.success(UsageData(
             fiveHour: UsageWindow(utilization: fiveUtil, resetsAt: fiveDate),
             sevenDay: UsageWindow(utilization: sevenUtil, resetsAt: sevenDate)
-        ))
+        )))
     }.resume()
 }
 
@@ -241,6 +263,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var sevenDayBarItem: NSMenuItem!
     var sevenDayItem: NSMenuItem!
     var sevenDayResetItem: NSMenuItem!
+    var loginItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let barWidth: CGFloat = 150
@@ -291,6 +314,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        loginItem = NSMenuItem(title: "Run: claude auth login", action: #selector(openLogin), keyEquivalent: "")
+        loginItem.target = self
+        loginItem.isHidden = true
+        menu.addItem(loginItem)
+
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         menu.delegate = self
@@ -319,25 +347,71 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refreshUsage()
     }
 
+    @objc func openLogin() {
+        let script = """
+        tell application "Terminal"
+            activate
+            do script "claude auth login"
+        end tell
+        """
+        if let appleScript = NSAppleScript(source: script) {
+            appleScript.executeAndReturnError(nil)
+        }
+    }
+
+    func showError(_ message: String, isAuthError: Bool = false) {
+        fiveHourBarItem.view = makeMenuItemView(styledMenuTitle(message))
+        fiveHourItem.view = makeMenuItemView("")
+        fiveHourResetItem.view = makeMenuItemView("")
+        sevenDayBarItem.view = makeMenuItemView("")
+        sevenDayItem.view = makeMenuItemView("")
+        sevenDayResetItem.view = makeMenuItemView("")
+        loginItem.isHidden = !isAuthError
+        nyanView.progress = 0
+    }
+
     func refreshUsage() {
-        guard let token = oauthToken else { return }
+        // Re-read token if missing (e.g. after auth failure or first launch without login)
+        if oauthToken == nil {
+            oauthToken = readOAuthToken()
+        }
+        guard let token = oauthToken else {
+            showError("claude auth login", isAuthError: true)
+            return
+        }
 
-        fetchUsage(token: token) { [weak self] usage in
+        fetchUsage(token: token) { [weak self] result in
             DispatchQueue.main.async {
-                guard let self = self, let usage = usage else { return }
-                self.latestUsage = usage
+                guard let self = self else { return }
 
-                // Update progress bar to show 5h utilization
-                let util = CGFloat(usage.fiveHour.utilization / 100.0)
-                self.nyanView.progress = min(max(util, 0), 1)
+                switch result {
+                case .success(let usage):
+                    self.loginItem.isHidden = true
+                    self.latestUsage = usage
 
-                // Update menu items
-                self.fiveHourBarItem.view = makeMenuItemView(styledMenuTitle(asciiProgressBar(usage.fiveHour.utilization, width: 15)))
-                self.fiveHourItem.view = makeMenuItemView(String(format: "Session: %.0f%%", usage.fiveHour.utilization))
-                self.fiveHourResetItem.view = makeMenuItemView("Resets in \(formatTimeUntil(usage.fiveHour.resetsAt))")
-                self.sevenDayBarItem.view = makeMenuItemView(styledMenuTitle(asciiProgressBar(usage.sevenDay.utilization, width: 15)))
-                self.sevenDayItem.view = makeMenuItemView(String(format: "Weekly: %.0f%%", usage.sevenDay.utilization))
-                self.sevenDayResetItem.view = makeMenuItemView("Resets in \(formatDaysUntil(usage.sevenDay.resetsAt))")
+                    // Update progress bar to show 5h utilization
+                    let util = CGFloat(usage.fiveHour.utilization / 100.0)
+                    self.nyanView.progress = min(max(util, 0), 1)
+
+                    // Update menu items
+                    self.fiveHourBarItem.view = makeMenuItemView(styledMenuTitle(asciiProgressBar(usage.fiveHour.utilization, width: 15)))
+                    self.fiveHourItem.view = makeMenuItemView(String(format: "Session: %.0f%%", usage.fiveHour.utilization))
+                    self.fiveHourResetItem.view = makeMenuItemView("Resets in \(formatTimeUntil(usage.fiveHour.resetsAt))")
+                    self.sevenDayBarItem.view = makeMenuItemView(styledMenuTitle(asciiProgressBar(usage.sevenDay.utilization, width: 15)))
+                    self.sevenDayItem.view = makeMenuItemView(String(format: "Weekly: %.0f%%", usage.sevenDay.utilization))
+                    self.sevenDayResetItem.view = makeMenuItemView("Resets in \(formatDaysUntil(usage.sevenDay.resetsAt))")
+
+                case .failure(.authError):
+                    // Clear cached token so next refresh re-reads from keychain
+                    self.oauthToken = nil
+                    self.showError("Run: claude login")
+
+                case .failure(.networkError):
+                    self.showError("Network error")
+
+                case .failure(.parseError):
+                    self.showError("API error")
+                }
             }
         }
     }
