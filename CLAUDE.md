@@ -55,6 +55,13 @@ README.md                                  # Build & launch setup docs
 - Rainbow trail: leftmost 1px column of the gif stretched horizontally behind the cat
 - No dock icon: `app.setActivationPolicy(.accessory)`
 
+### Flash notification
+- Pulsing white overlay (1s sine wave cycle) triggered via `DistributedNotificationCenter`
+- `com.vibelimit.flash.on` starts the flash, `com.vibelimit.flash.off` stops it
+- Clicking the menu bar item also stops the flash
+- "Flash!" menu item toggles it manually for testing
+- Claude Code hooks: `Notification` → flash on, `Stop` → flash off
+
 ## Build & run
 
 ```sh

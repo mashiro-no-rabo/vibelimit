@@ -131,6 +131,9 @@ class NyanProgressView: NSView {
     var catFrames: [GIFFrame] = []
     var currentFrameIndex: Int = 0
     private var frameDurationAccumulator: TimeInterval = 0
+    var flashAlpha: CGFloat = 0
+    private var flashTimer: Timer?
+    private var flashPhase: CGFloat = 0
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -183,7 +186,34 @@ class NyanProgressView: NSView {
         let catRect = NSRect(x: catX, y: catY, width: catWidth, height: catHeight)
         frame.image.draw(in: catRect, from: .zero, operation: .sourceOver, fraction: 1.0)
 
+        // Flash overlay
+        if flashAlpha > 0 {
+            NSColor.white.withAlphaComponent(flashAlpha).setFill()
+            bounds.fill()
+        }
+
         NSGraphicsContext.restoreGraphicsState()
+    }
+
+    var isFlashing: Bool { flashTimer != nil }
+
+    func startFlash() {
+        guard flashTimer == nil else { return }
+        flashPhase = 0
+        flashTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.flashPhase += 1.0 / 30.0
+            // Sine wave: 1s full cycle
+            self.flashAlpha = CGFloat((sin(self.flashPhase * 2 * .pi) + 1) / 2)
+            self.needsDisplay = true
+        }
+    }
+
+    func stopFlash() {
+        flashTimer?.invalidate()
+        flashTimer = nil
+        flashAlpha = 0
+        needsDisplay = true
     }
 }
 
@@ -319,6 +349,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         loginItem.isHidden = true
         menu.addItem(loginItem)
 
+        let flashItem = NSMenuItem(title: "Flash!", action: #selector(triggerFlash), keyEquivalent: "")
+        flashItem.target = self
+        menu.addItem(flashItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         menu.delegate = self
@@ -341,10 +377,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.nyanView.advanceFrame(dt: 1.0 / 30.0)
             self.nyanView.needsDisplay = true
         }
+
+        // Listen for distributed notifications to control flash
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(handleFlashOn),
+            name: NSNotification.Name("com.vibelimit.flash.on"), object: nil
+        )
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(handleFlashOff),
+            name: NSNotification.Name("com.vibelimit.flash.off"), object: nil
+        )
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        nyanView.stopFlash()
         refreshUsage()
+    }
+
+    @objc func handleFlashOn(_ notification: Notification) {
+        nyanView.startFlash()
+    }
+
+    @objc func handleFlashOff(_ notification: Notification) {
+        nyanView.stopFlash()
+    }
+
+    @objc func triggerFlash() {
+        if nyanView.isFlashing {
+            nyanView.stopFlash()
+        } else {
+            nyanView.startFlash()
+        }
     }
 
     @objc func openLogin() {
