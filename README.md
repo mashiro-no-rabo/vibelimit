@@ -48,9 +48,9 @@ launchctl unload ~/Library/LaunchAgents/com.vibelimit.app.plist
 
 ## Flash notification for Claude Code
 
-The menu bar flashes (pulsing white overlay) when Claude Code needs your attention, and stops when Claude finishes responding. Click the menu bar item to dismiss manually.
+The menu bar flashes (pulsing white overlay) when Claude Code needs your attention. Each Claude session is tracked independently — the flash only stops when all sessions have cleared. Open the menu to see which sessions need attention (shown by project folder name), and use "Clear notifications" to dismiss all.
 
-Add these hooks to `~/.claude/settings.json`:
+Add these hooks to `~/.claude/settings.json` (adjust the path to `flash-notify.swift`):
 
 ```json
 {
@@ -60,7 +60,7 @@ Add these hooks to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(NSNotification.Name(\"com.vibelimit.flash.on\"), object: nil)'"
+            "command": "swift /path/to/vibelimit/flash-notify.swift on"
           }
         ]
       }
@@ -70,7 +70,37 @@ Add these hooks to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(NSNotification.Name(\"com.vibelimit.flash.off\"), object: nil)'"
+            "command": "swift /path/to/vibelimit/flash-notify.swift off"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "swift /path/to/vibelimit/flash-notify.swift off"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "swift /path/to/vibelimit/flash-notify.swift off"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "swift /path/to/vibelimit/flash-notify.swift off"
           }
         ]
       }
@@ -78,3 +108,5 @@ Add these hooks to `~/.claude/settings.json`:
   }
 }
 ```
+
+The `flash-notify.swift` script reads `session_id` and `cwd` from the hook's JSON stdin and passes them to the app via distributed notifications.

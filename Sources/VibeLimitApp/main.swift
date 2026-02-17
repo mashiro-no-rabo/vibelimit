@@ -285,6 +285,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var usageTimer: Timer?
     var latestUsage: UsageData?
     var oauthToken: String?
+    var flashingSessions: [String: String] = [:]  // session_id -> display name
 
     // Menu items we update dynamically
     var fiveHourBarItem: NSMenuItem!
@@ -294,6 +295,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var sevenDayItem: NSMenuItem!
     var sevenDayResetItem: NSMenuItem!
     var loginItem: NSMenuItem!
+
+    // Flash notification menu items (inserted dynamically)
+    var flashSeparatorItem: NSMenuItem!
+    var clearAllItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let barWidth: CGFloat = 150
@@ -349,9 +354,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         loginItem.isHidden = true
         menu.addItem(loginItem)
 
-        let flashItem = NSMenuItem(title: "Flash!", action: #selector(triggerFlash), keyEquivalent: "")
-        flashItem.target = self
-        menu.addItem(flashItem)
+        flashSeparatorItem = NSMenuItem.separator()
+        flashSeparatorItem.isHidden = true
+        menu.addItem(flashSeparatorItem)
+
+        clearAllItem = NSMenuItem(title: "Clear notifications", action: #selector(clearAllFlash), keyEquivalent: "")
+        clearAllItem.target = self
+        clearAllItem.isHidden = true
+        menu.addItem(clearAllItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -390,23 +400,59 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
-        nyanView.stopFlash()
+        rebuildFlashMenuItems()
         refreshUsage()
     }
 
+    private func parseFlashPayload(_ notification: Notification) -> (id: String, name: String)? {
+        guard let jsonString = notification.object as? String,
+              let data = jsonString.data(using: .utf8),
+              let payload = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+              let id = payload["id"] else { return nil }
+        return (id, payload["name"] ?? id)
+    }
+
     @objc func handleFlashOn(_ notification: Notification) {
+        if let info = parseFlashPayload(notification) {
+            flashingSessions[info.id] = info.name
+        }
         nyanView.startFlash()
     }
 
     @objc func handleFlashOff(_ notification: Notification) {
+        if let info = parseFlashPayload(notification) {
+            flashingSessions.removeValue(forKey: info.id)
+        }
+        if flashingSessions.isEmpty {
+            nyanView.stopFlash()
+        }
+    }
+
+    @objc func clearAllFlash() {
+        flashingSessions.removeAll()
         nyanView.stopFlash()
     }
 
-    @objc func triggerFlash() {
-        if nyanView.isFlashing {
-            nyanView.stopFlash()
-        } else {
-            nyanView.startFlash()
+    private func rebuildFlashMenuItems() {
+        guard let menu = statusItem.menu else { return }
+
+        // Remove old dynamic session items (tagged with 999)
+        for item in menu.items where item.tag == 999 {
+            menu.removeItem(item)
+        }
+
+        let hasNotifications = !flashingSessions.isEmpty
+        flashSeparatorItem.isHidden = !hasNotifications
+        clearAllItem.isHidden = !hasNotifications
+
+        if hasNotifications {
+            let insertIndex = menu.index(of: clearAllItem)
+            for (_, name) in flashingSessions.sorted(by: { $0.value < $1.value }) {
+                let item = NSMenuItem()
+                item.view = makeMenuItemView("❓ \(name)")
+                item.tag = 999
+                menu.insertItem(item, at: insertIndex)
+            }
         }
     }
 

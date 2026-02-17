@@ -23,6 +23,7 @@ macOS menu bar app that shows Claude usage as a pikanyan nyan cat progress bar.
 Package.swift                              # SPM manifest
 Sources/VibeLimitApp/main.swift            # All app code (single file)
 Sources/VibeLimitApp/Resources/pikanyan.gif # Animated gif from vscode-nyan-cat
+flash-notify.swift                         # Helper script for Claude Code hooks
 com.vibelimit.app.plist                    # LaunchAgent plist for launchctl
 README.md                                  # Build & launch setup docs
 .gitignore
@@ -58,9 +59,12 @@ README.md                                  # Build & launch setup docs
 ### Flash notification
 - Pulsing white overlay (1s sine wave cycle) triggered via `DistributedNotificationCenter`
 - `com.vibelimit.flash.on` starts the flash, `com.vibelimit.flash.off` stops it
-- Clicking the menu bar item also stops the flash
-- "Flash!" menu item toggles it manually for testing
-- Claude Code hooks: `Notification` → flash on, `Stop` → flash off
+- Session ID tracking: each Claude session's flash is tracked independently; flash only stops when all sessions have cleared
+- Menu shows ❓ per session (project folder name) with "Clear notifications" button
+- `flash-notify.swift` helper reads session_id + cwd from hook JSON stdin and posts the distributed notification
+- Claude Code hooks:
+  - Flash on: `Notification`
+  - Flash off: `Stop`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`
 
 ## Build & run
 
