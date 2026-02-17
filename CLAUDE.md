@@ -63,8 +63,8 @@ README.md                                  # Build & launch setup docs
 - Menu shows ❓ per session (project folder name) with "Clear notifications" button
 - `flash-notify.swift` helper reads session_id + cwd from hook JSON stdin and posts the distributed notification
 - Claude Code hooks:
-  - Flash on: `Notification`
-  - Flash off: `Stop`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`
+  - Flash on: `Notification` (matchers: `permission_prompt`, `idle_prompt`)
+  - Flash off: `Stop`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`
 
 ## Build & run
 
