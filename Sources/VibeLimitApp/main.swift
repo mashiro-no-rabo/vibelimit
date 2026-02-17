@@ -131,6 +131,7 @@ class NyanProgressView: NSView {
     var catFrames: [GIFFrame] = []
     var currentFrameIndex: Int = 0
     private var frameDurationAccumulator: TimeInterval = 0
+    private var lastTickTime: CFTimeInterval = 0
     var flashAlpha: CGFloat = 0
     private var flashTimer: Timer?
     private var flashPhase: CGFloat = 0
@@ -145,14 +146,26 @@ class NyanProgressView: NSView {
         catFrames = extractGIFFrames(from: url)
     }
 
-    func advanceFrame(dt: TimeInterval) {
-        guard !catFrames.isEmpty else { return }
+    /// Advances GIF frame using real elapsed time. Returns true if the displayed frame changed.
+    func advanceFrame() -> Bool {
+        guard !catFrames.isEmpty else { return false }
+        let now = CACurrentMediaTime()
+        let dt: TimeInterval
+        if lastTickTime == 0 {
+            dt = 0
+        } else {
+            dt = min(now - lastTickTime, 0.5) // cap to avoid jumps after sleep
+        }
+        lastTickTime = now
+
+        let prevIndex = currentFrameIndex
         frameDurationAccumulator += dt
         let currentDuration = catFrames[currentFrameIndex].duration
         if frameDurationAccumulator >= currentDuration {
             frameDurationAccumulator -= currentDuration
             currentFrameIndex = (currentFrameIndex + 1) % catFrames.count
         }
+        return currentFrameIndex != prevIndex
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -381,12 +394,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         usageTimer?.tolerance = 5
         RunLoop.current.add(usageTimer!, forMode: .common)
 
-        // Animation timer at ~30fps
+        // Animation timer at ~30fps with tolerance for energy efficiency
         animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            self.nyanView.advanceFrame(dt: 1.0 / 30.0)
-            self.nyanView.needsDisplay = true
+            if self.nyanView.advanceFrame() {
+                self.nyanView.needsDisplay = true
+            }
         }
+        animationTimer?.tolerance = 0.005 // ~5ms tolerance lets macOS coalesce timer fires
 
         // Listen for distributed notifications to control flash
         DistributedNotificationCenter.default().addObserver(
