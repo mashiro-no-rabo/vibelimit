@@ -299,6 +299,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var latestUsage: UsageData?
     var oauthToken: String?
     var flashingSessions: [String: String] = [:]  // session_id -> display name
+    var lastFlashTime: Date?
+    var lastMenuClickTime: Date?
 
     // Menu items we update dynamically
     var fiveHourBarItem: NSMenuItem!
@@ -415,6 +417,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        lastMenuClickTime = Date()
+        nyanView.stopFlash()
         rebuildFlashMenuItems()
         refreshUsage()
     }
@@ -431,6 +435,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let info = parseFlashPayload(notification) {
             flashingSessions[info.id] = info.name
         }
+        lastFlashTime = Date()
         nyanView.startFlash()
     }
 

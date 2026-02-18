@@ -60,7 +60,9 @@ README.md                                  # Build & launch setup docs
 - Pulsing white overlay (1s sine wave cycle) triggered via `DistributedNotificationCenter`
 - `com.vibelimit.flash.on` starts the flash, `com.vibelimit.flash.off` stops it
 - Session ID tracking: each Claude session's flash is tracked independently; flash only stops when all sessions have cleared
-- Menu shows ❓ per session (project folder name) with "Clear notifications" button
+- Menu shows notifications at the top: "Clear notifications" button followed by ❓ per session (project folder name)
+- Clicking the menu bar item dismisses flashing; new flash-on notifications resume it
+- Tracks `lastFlashTime` and `lastMenuClickTime` for dismiss/resume logic
 - `flash-notify.swift` helper reads session_id + cwd from hook JSON stdin and posts the distributed notification
 - Claude Code hooks:
   - Flash on: `Notification` (matchers: `permission_prompt`, `idle_prompt`)
