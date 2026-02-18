@@ -334,6 +334,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.autoenablesItems = false
         menu.minimumWidth = menuContentWidth
 
+        clearAllItem = NSMenuItem(title: "Clear notifications", action: #selector(clearAllFlash), keyEquivalent: "")
+        clearAllItem.target = self
+        clearAllItem.isHidden = true
+        menu.addItem(clearAllItem)
+
+        flashSeparatorItem = NSMenuItem.separator()
+        flashSeparatorItem.isHidden = true
+        menu.addItem(flashSeparatorItem)
+
         fiveHourBarItem = NSMenuItem()
         fiveHourBarItem.view = makeMenuItemView(styledMenuTitle(asciiProgressBar(0, width: 15)))
         menu.addItem(fiveHourBarItem)
@@ -366,15 +375,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         loginItem.target = self
         loginItem.isHidden = true
         menu.addItem(loginItem)
-
-        flashSeparatorItem = NSMenuItem.separator()
-        flashSeparatorItem.isHidden = true
-        menu.addItem(flashSeparatorItem)
-
-        clearAllItem = NSMenuItem(title: "Clear notifications", action: #selector(clearAllFlash), keyEquivalent: "")
-        clearAllItem.target = self
-        clearAllItem.isHidden = true
-        menu.addItem(clearAllItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -461,12 +461,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         clearAllItem.isHidden = !hasNotifications
 
         if hasNotifications {
-            let insertIndex = menu.index(of: clearAllItem)
+            var insertIndex = menu.index(of: clearAllItem) + 1
             for (_, name) in flashingSessions.sorted(by: { $0.value < $1.value }) {
                 let item = NSMenuItem()
                 item.view = makeMenuItemView("❓ \(name)")
                 item.tag = 999
                 menu.insertItem(item, at: insertIndex)
+                insertIndex += 1
             }
         }
     }
