@@ -90,32 +90,47 @@ func fetchUsage(token: String, completion: @escaping (UsageResult) -> Void) {
     let isoFormatter = ISO8601DateFormatter()
     isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
+    // Fallback formatter without fractional seconds
+    let isoFormatterNoFrac = ISO8601DateFormatter()
+    isoFormatterNoFrac.formatOptions = [.withInternetDateTime]
+
+    func parseDate(_ string: String) -> Date? {
+        isoFormatter.date(from: string) ?? isoFormatterNoFrac.date(from: string)
+    }
+
     URLSession.shared.dataTask(with: request) { data, response, error in
         if error != nil {
             completion(.failure(.networkError))
             return
         }
 
-        if let httpResponse = response as? HTTPURLResponse,
-           httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-            completion(.failure(.authError))
-            return
+        if let httpResponse = response as? HTTPURLResponse {
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                completion(.failure(.authError))
+                return
+            }
+            if httpResponse.statusCode != 200 {
+                completion(.failure(.networkError))
+                return
+            }
         }
 
         guard let data = data,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let fiveHour = json["five_hour"] as? [String: Any],
               let sevenDay = json["seven_day"] as? [String: Any],
-              let fiveUtil = fiveHour["utilization"] as? Double,
               let fiveReset = fiveHour["resets_at"] as? String,
-              let sevenUtil = sevenDay["utilization"] as? Double,
               let sevenReset = sevenDay["resets_at"] as? String,
-              let fiveDate = isoFormatter.date(from: fiveReset),
-              let sevenDate = isoFormatter.date(from: sevenReset)
+              let fiveDate = parseDate(fiveReset),
+              let sevenDate = parseDate(sevenReset)
         else {
             completion(.failure(.parseError))
             return
         }
+
+        // Utilization may be null or missing; default to 0
+        let fiveUtil = (fiveHour["utilization"] as? Double) ?? 0
+        let sevenUtil = (sevenDay["utilization"] as? Double) ?? 0
 
         completion(.success(UsageData(
             fiveHour: UsageWindow(utilization: fiveUtil, resetsAt: fiveDate),
