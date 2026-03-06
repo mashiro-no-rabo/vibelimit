@@ -393,6 +393,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         loginItem.isHidden = true
         menu.addItem(loginItem)
 
+        let refreshItem = NSMenuItem(title: "Refresh", action: #selector(refreshUsage), keyEquivalent: "r")
+        refreshItem.target = self
+        refreshItem.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: "Refresh")
+        menu.addItem(refreshItem)
+
         menu.addItem(NSMenuItem.separator())
 
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -435,7 +440,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         lastMenuClickTime = Date()
         nyanView.stopFlash()
         rebuildFlashMenuItems()
-        refreshUsage()
     }
 
     private func parseFlashPayload(_ notification: Notification) -> (id: String, name: String)? {
@@ -515,7 +519,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         nyanView.progress = 0
     }
 
-    func refreshUsage() {
+    @objc func refreshUsage() {
         // Re-read token if missing (e.g. after auth failure or first launch without login)
         if oauthToken == nil {
             oauthToken = readOAuthToken()
