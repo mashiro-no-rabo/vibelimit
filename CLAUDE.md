@@ -9,7 +9,8 @@ macOS menu bar app that shows Claude usage as a pikanyan nyan cat progress bar.
 - Rainbow trail (stretched from the gif's left edge) fills behind the cat
 - Click the menu bar item to see: session/weekly usage % with ▰▱ progress bars, session resets in h/m, weekly resets in days
 - Usage refreshes every 60 seconds and on menu open
-- On auth/token errors, shows a "Run: claude auth login" menu item that opens Terminal to run the command
+- Requires Claude Desktop to be logged in (reads its cookies for API access)
+- On auth errors, shows an "Open Claude Desktop to log in" menu item
 
 ## Tech stack
 
@@ -37,17 +38,18 @@ README.md                                  # Build & launch setup docs
 - Animated at ~30fps via a Timer
 
 ### Usage API
-- Endpoint: `GET https://api.anthropic.com/api/oauth/usage`
-- Header: `Authorization: Bearer <token>`, `anthropic-beta: oauth-2025-04-20`
+- Endpoint: `GET https://claude.ai/api/organizations/{orgId}/usage`
+- Auth: `sessionKey` and `lastActiveOrg` cookies from Claude Desktop
 - Response: `{ "five_hour": { "utilization": 37.0, "resets_at": "..." }, "seven_day": { ... } }`
 - Utilization is a percentage (0–100), resets_at is ISO 8601 with fractional seconds
-- Error handling: 401/403 → auth error (prompts login), network errors and parse errors shown in menu
-- On auth error, cached token is cleared; next refresh re-reads from keychain to auto-recover after login
+- Error handling: 401/403 → auth error (prompts login), 429 → rate limited, network/parse errors shown in menu
 
-### OAuth token
-- Read from macOS Keychain via `/usr/bin/security find-generic-password -s "Claude Code-credentials" -w`
-- Shelling out to the `security` CLI avoids repeated Keychain access prompts (the Security framework prompts on every rebuild since unsigned binaries get new identities)
-- The keychain entry is a JSON blob; token is at `claudeAiOauth.accessToken`
+### Claude Desktop cookies
+- Reads encrypted Chromium cookies from `~/Library/Application Support/Claude/Cookies` (SQLite)
+- Decryption key: macOS Keychain item "Claude Safe Storage", derived via PBKDF2 (salt "saltysalt", 1003 iterations, 16-byte key)
+- AES-128-CBC decryption (IV = 16 spaces), strip 32-byte prefix from plaintext
+- Shelling out to `/usr/bin/security` CLI avoids repeated Keychain access prompts (the Security framework prompts on every rebuild since unsigned binaries get new identities)
+- Extracts `sessionKey` (auth) and `lastActiveOrg` (org ID for API URL)
 
 ### Menu bar view
 - NSStatusItem with length 150px

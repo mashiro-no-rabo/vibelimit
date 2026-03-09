@@ -4,7 +4,7 @@ macOS menu bar app that shows Claude usage as a pikanyan nyan cat progress bar.
 
 The cat's position represents your 5-hour session utilization (0–100%), with a rainbow trail filling behind it. Click the menu bar item to see usage details and reset times.
 
-If the OAuth token is missing or expired, the menu shows a "Run: claude auth login" item that opens Terminal to re-authenticate.
+Requires **Claude Desktop** to be logged in — usage data is read via Claude Desktop's session cookies.
 
 ## Build
 
