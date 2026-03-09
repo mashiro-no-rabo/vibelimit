@@ -57,16 +57,7 @@ Add these hooks to `~/.claude/settings.json` (adjust the path to `flash-notify.s
   "hooks": {
     "Notification": [
       {
-        "matcher": "permission_prompt",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "swift /path/to/vibelimit/flash-notify.swift on"
-          }
-        ]
-      },
-      {
-        "matcher": "idle_prompt",
+        "matcher": "permission_prompt|idle_prompt",
         "hooks": [
           {
             "type": "command",
