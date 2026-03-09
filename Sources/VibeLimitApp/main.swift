@@ -228,10 +228,6 @@ class NyanProgressView: NSView {
     var currentFrameIndex: Int = 0
     private var frameDurationAccumulator: TimeInterval = 0
     private var lastTickTime: CFTimeInterval = 0
-    var flashAlpha: CGFloat = 0
-    private var flashTimer: Timer?
-    private var flashPhase: CGFloat = 0
-
     override init(frame: NSRect) {
         super.init(frame: frame)
     }
@@ -295,16 +291,32 @@ class NyanProgressView: NSView {
         let catRect = NSRect(x: catX, y: catY, width: catWidth, height: catHeight)
         frame.image.draw(in: catRect, from: .zero, operation: .sourceOver, fraction: 1.0)
 
-        // Flash overlay
-        if flashAlpha > 0 {
-            NSColor.white.withAlphaComponent(flashAlpha).setFill()
-            bounds.fill()
-        }
-
         NSGraphicsContext.restoreGraphicsState()
     }
+}
 
-    var isFlashing: Bool { flashTimer != nil }
+// MARK: - Badge View
+
+class BadgeView: NSView {
+    var count: Int = 0 {
+        didSet {
+            isHidden = count <= 0
+            if count > 0 { startFlash() } else { stopFlash() }
+            needsDisplay = true
+        }
+    }
+
+    private var flashTimer: Timer?
+    private var flashPhase: CGFloat = 0
+    private var flashAlpha: CGFloat = 1
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        isHidden = true
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
 
     func startFlash() {
         guard flashTimer == nil else { return }
@@ -312,8 +324,7 @@ class NyanProgressView: NSView {
         flashTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             self.flashPhase += 1.0 / 30.0
-            // Sine wave: 1s full cycle
-            self.flashAlpha = CGFloat((sin(self.flashPhase * 2 * .pi) + 1) / 2)
+            self.flashAlpha = CGFloat((sin(self.flashPhase * 2 * .pi) + 1) / 2) * 0.6 + 0.4
             self.needsDisplay = true
         }
     }
@@ -321,8 +332,38 @@ class NyanProgressView: NSView {
     func stopFlash() {
         flashTimer?.invalidate()
         flashTimer = nil
-        flashAlpha = 0
+        flashAlpha = 1
         needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard count > 0 else { return }
+
+        let badgeText = "\(count)"
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.black
+        ]
+        let textSize = (badgeText as NSString).size(withAttributes: attrs)
+        let badgeHeight: CGFloat = 18
+        let badgeWidth = max(textSize.width + 8, badgeHeight)
+        let badgeRect = NSRect(
+            x: bounds.width - badgeWidth,
+            y: (bounds.height - badgeHeight) / 2,
+            width: badgeWidth,
+            height: badgeHeight
+        )
+        // Use the same foreground color macOS uses for menu bar icons
+        (NSColor.controlTextColor.withAlphaComponent(flashAlpha)).setFill()
+        NSBezierPath(roundedRect: badgeRect, xRadius: badgeHeight / 2, yRadius: badgeHeight / 2).fill()
+        let textRect = NSRect(
+            x: badgeRect.midX - textSize.width / 2,
+            y: badgeRect.midY - textSize.height / 2,
+            width: textSize.width,
+            height: textSize.height
+        )
+        (badgeText as NSString).draw(in: textRect, withAttributes: attrs)
     }
 }
 
@@ -390,12 +431,11 @@ func formatDaysUntil(_ date: Date) -> String {
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var statusItem: NSStatusItem!
     var nyanView: NyanProgressView!
+    var badgeView: BadgeView!
     var animationTimer: Timer?
     var usageTimer: Timer?
     var latestUsage: UsageData?
     var flashingSessions: [String: String] = [:]  // session_id -> display name
-    var lastFlashTime: Date?
-    var lastMenuClickTime: Date?
 
     // Menu items we update dynamically
     var fiveHourBarItem: NSMenuItem!
@@ -425,6 +465,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let gifURL = Bundle.module.url(forResource: "pikanyan", withExtension: "gif") {
             nyanView.loadFrames(from: gifURL)
         }
+
+        badgeView = BadgeView(frame: button.bounds)
+        badgeView.autoresizingMask = [.width, .height]
+        button.addSubview(badgeView)
 
         // Build menu
         let menu = NSMenu()
@@ -515,8 +559,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
-        lastMenuClickTime = Date()
-        nyanView.stopFlash()
+        badgeView.stopFlash()
         rebuildFlashMenuItems()
     }
 
@@ -532,22 +575,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let info = parseFlashPayload(notification) {
             flashingSessions[info.id] = info.name
         }
-        lastFlashTime = Date()
-        nyanView.startFlash()
+        updateBadge()
     }
 
     @objc func handleFlashOff(_ notification: Notification) {
         if let info = parseFlashPayload(notification) {
             flashingSessions.removeValue(forKey: info.id)
         }
-        if flashingSessions.isEmpty {
-            nyanView.stopFlash()
-        }
+        updateBadge()
     }
 
     @objc func clearAllFlash() {
         flashingSessions.removeAll()
-        nyanView.stopFlash()
+        updateBadge()
+    }
+
+    private func updateBadge() {
+        badgeView.count = flashingSessions.count
     }
 
     private func rebuildFlashMenuItems() {
