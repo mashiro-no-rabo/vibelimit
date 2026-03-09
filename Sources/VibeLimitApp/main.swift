@@ -312,7 +312,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var animationTimer: Timer?
     var usageTimer: Timer?
     var latestUsage: UsageData?
-    var oauthToken: String?
     var flashingSessions: [String: String] = [:]  // session_id -> display name
     var lastFlashTime: Date?
     var lastMenuClickTime: Date?
@@ -405,8 +404,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         statusItem.menu = menu
 
-        // Read token and fetch usage
-        oauthToken = readOAuthToken()
         refreshUsage()
 
         // Refresh usage every 60 seconds
@@ -520,11 +517,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func refreshUsage() {
-        // Re-read token if missing (e.g. after auth failure or first launch without login)
-        if oauthToken == nil {
-            oauthToken = readOAuthToken()
-        }
-        guard let token = oauthToken else {
+        // Always re-read token from keychain (it may have been refreshed)
+        guard let token = readOAuthToken() else {
             showError("claude auth login", isAuthError: true)
             return
         }
@@ -551,8 +545,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self.sevenDayResetItem.view = makeMenuItemView("Resets in \(formatDaysUntil(usage.sevenDay.resetsAt))")
 
                 case .failure(.authError):
-                    // Clear cached token so next refresh re-reads from keychain
-                    self.oauthToken = nil
                     self.showError("Run: claude login")
 
                 case .failure(.networkError):
