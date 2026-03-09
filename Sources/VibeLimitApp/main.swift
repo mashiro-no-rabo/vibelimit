@@ -1,5 +1,7 @@
 import AppKit
+import CommonCrypto
 import ImageIO
+import SQLite3
 
 // MARK: - GIF Frame Extraction
 
@@ -46,30 +48,105 @@ struct UsageData {
     let sevenDay: UsageWindow
 }
 
-func readOAuthToken() -> String? {
+struct ClaudeCookies {
+    let sessionKey: String
+    let orgId: String
+}
+
+func readClaudeCookies() -> ClaudeCookies? {
+    // Get encryption password from keychain
     let proc = Process()
     proc.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-    proc.arguments = ["find-generic-password", "-s", "Claude Code-credentials", "-w"]
+    proc.arguments = ["find-generic-password", "-s", "Claude Safe Storage", "-w"]
     let pipe = Pipe()
     proc.standardOutput = pipe
     proc.standardError = FileHandle.nullDevice
-
-    guard (try? proc.run()) != nil else { return nil }
+    guard (try? proc.run()) != nil else { NSLog("VL: security exec failed"); return nil }
     proc.waitUntilExit()
-    guard proc.terminationStatus == 0 else { return nil }
+    guard proc.terminationStatus == 0 else { NSLog("VL: security exit %d", proc.terminationStatus); return nil }
+    let pwData = pipe.fileHandleForReading.readDataToEndOfFile()
+    guard let password = String(data: pwData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !password.isEmpty else { NSLog("VL: empty password"); return nil }
 
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-          let oauth = json["claudeAiOauth"] as? [String: Any],
-          let token = oauth["accessToken"] as? String else { return nil }
+    // Derive AES-128 key via PBKDF2
+    let salt = "saltysalt".data(using: .utf8)!
+    var derivedKey = [UInt8](repeating: 0, count: 16)
+    let status = CCKeyDerivationPBKDF(
+        CCPBKDFAlgorithm(kCCPBKDF2),
+        password, password.utf8.count,
+        [UInt8](salt), salt.count,
+        CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1),
+        1003,
+        &derivedKey, 16
+    )
+    guard status == kCCSuccess else { NSLog("VL: PBKDF2 failed"); return nil }
 
-    return token
+    // Open SQLite cookies database
+    let cookiesPath = NSHomeDirectory() + "/Library/Application Support/Claude/Cookies"
+    var db: OpaquePointer?
+    guard sqlite3_open_v2(cookiesPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+        NSLog("VL: sqlite open failed: %s", String(cString: sqlite3_errmsg(db)))
+        return nil
+    }
+    defer { sqlite3_close(db) }
+
+    func readCookie(name: String) -> String? {
+        var stmt: OpaquePointer?
+        let sql = "SELECT encrypted_value FROM cookies WHERE host_key LIKE '%claude.ai%' AND name = ?"
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            NSLog("VL: prepare failed for %@", name)
+            return nil
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, (name as NSString).utf8String, -1, nil)
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            NSLog("VL: no row for %@", name)
+            return nil
+        }
+
+        let blobPtr = sqlite3_column_blob(stmt, 0)
+        let blobLen = Int(sqlite3_column_bytes(stmt, 0))
+        guard let blobPtr = blobPtr, blobLen > 3 else { NSLog("VL: blob too short for %@", name); return nil }
+        let encrypted = Data(bytes: blobPtr, count: blobLen)
+
+        // Expect "v10" prefix
+        guard encrypted.prefix(3) == Data("v10".utf8) else { NSLog("VL: no v10 prefix for %@", name); return nil }
+        let ciphertext = [UInt8](encrypted.dropFirst(3))
+
+        // AES-128-CBC with 16 spaces as IV
+        let iv = [UInt8](repeating: 0x20, count: 16)
+        var decrypted = [UInt8](repeating: 0, count: ciphertext.count + kCCBlockSizeAES128)
+        var decryptedLen = 0
+        let cryptStatus = CCCrypt(
+            CCOperation(kCCDecrypt),
+            CCAlgorithm(kCCAlgorithmAES128),
+            0, // no padding flag — we strip PKCS7 manually
+            derivedKey, 16,
+            iv,
+            ciphertext, ciphertext.count,
+            &decrypted, decrypted.count,
+            &decryptedLen
+        )
+        guard cryptStatus == kCCSuccess else { NSLog("VL: decrypt failed %d for %@", cryptStatus, name); return nil }
+        guard decryptedLen > 32 else { NSLog("VL: decrypted too short for %@", name); return nil }
+
+        // Strip PKCS7 padding, then strip 32-byte prefix
+        let padLen = Int(decrypted[decryptedLen - 1])
+        let plaintext = Data(decrypted[0..<(decryptedLen - padLen)])
+        guard plaintext.count > 32 else { NSLog("VL: plaintext too short for %@", name); return nil }
+        return String(data: plaintext.dropFirst(32), encoding: .utf8)
+    }
+
+    guard let sessionKey = readCookie(name: "sessionKey"),
+          let orgId = readCookie(name: "lastActiveOrg") else { return nil }
+    return ClaudeCookies(sessionKey: sessionKey, orgId: orgId)
 }
 
 enum UsageError {
     case authError
     case networkError
     case parseError
+    case rateLimited
 }
 
 enum UsageResult {
@@ -77,15 +154,15 @@ enum UsageResult {
     case failure(UsageError)
 }
 
-func fetchUsage(token: String, completion: @escaping (UsageResult) -> Void) {
-    guard let url = URL(string: "https://api.anthropic.com/api/oauth/usage") else {
+func fetchUsage(cookies: ClaudeCookies, completion: @escaping (UsageResult) -> Void) {
+    guard let url = URL(string: "https://claude.ai/api/organizations/\(cookies.orgId)/usage") else {
         completion(.failure(.networkError))
         return
     }
 
     var request = URLRequest(url: url)
-    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-    request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
+    request.setValue("sessionKey=\(cookies.sessionKey); lastActiveOrg=\(cookies.orgId)", forHTTPHeaderField: "Cookie")
+    request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36", forHTTPHeaderField: "User-Agent")
 
     let isoFormatter = ISO8601DateFormatter()
     isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -107,6 +184,10 @@ func fetchUsage(token: String, completion: @escaping (UsageResult) -> Void) {
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 completion(.failure(.authError))
+                return
+            }
+            if httpResponse.statusCode == 429 {
+                completion(.failure(.rateLimited))
                 return
             }
             if httpResponse.statusCode != 200 {
@@ -387,7 +468,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        loginItem = NSMenuItem(title: "Run: claude auth login", action: #selector(openLogin), keyEquivalent: "")
+        loginItem = NSMenuItem(title: "Open Claude Desktop to log in", action: #selector(openLogin), keyEquivalent: "")
         loginItem.target = self
         loginItem.isHidden = true
         menu.addItem(loginItem)
@@ -494,14 +575,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func openLogin() {
-        let script = """
-        tell application "Terminal"
-            activate
-            do script "claude auth login"
-        end tell
-        """
-        if let appleScript = NSAppleScript(source: script) {
-            appleScript.executeAndReturnError(nil)
+        if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anthropic.claudefordesktop") {
+            NSWorkspace.shared.openApplication(at: appURL, configuration: NSWorkspace.OpenConfiguration())
         }
     }
 
@@ -517,13 +592,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func refreshUsage() {
-        // Always re-read token from keychain (it may have been refreshed)
-        guard let token = readOAuthToken() else {
-            showError("claude auth login", isAuthError: true)
+        // Read cookies from Claude Desktop's Chromium cookie store
+        guard let cookies = readClaudeCookies() else {
+            showError("Open Claude Desktop", isAuthError: true)
             return
         }
 
-        fetchUsage(token: token) { [weak self] result in
+        fetchUsage(cookies: cookies) { [weak self] result in
             DispatchQueue.main.async {
                 guard let self = self else { return }
 
@@ -549,6 +624,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
                 case .failure(.networkError):
                     self.showError("Network error")
+
+                case .failure(.rateLimited):
+                    self.showError("Rate limited")
 
                 case .failure(.parseError):
                     self.showError("API error")
