@@ -43,6 +43,7 @@ README.md                                  # Build & launch setup docs
 - Response: `{ "five_hour": { "utilization": 37.0, "resets_at": "..." }, "seven_day": { ... } }`
 - Utilization is a percentage (0–100), resets_at is ISO 8601 with fractional seconds
 - Error handling: 401/403 → auth error (prompts login), 429 → rate limited, network/parse errors shown in menu
+- On any fetch failure: animation stops, cat freezes on frame 0 and shifts 50% off the left edge (progress = nil)
 
 ### Claude Desktop cookies
 - Reads encrypted Chromium cookies from `~/Library/Application Support/Claude/Cookies` (SQLite)
@@ -68,7 +69,7 @@ README.md                                  # Build & launch setup docs
 - `flash-notify.swift` helper reads session_id + cwd from hook JSON stdin and posts the distributed notification
 - Claude Code hooks:
   - Flash on: `Notification` (matchers: `permission_prompt`, `idle_prompt`)
-  - Flash off: `Stop`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`
+  - Flash off: `Stop`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SessionEnd`
 
 ## Build & run
 

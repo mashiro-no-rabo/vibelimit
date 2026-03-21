@@ -223,7 +223,7 @@ func fetchUsage(cookies: ClaudeCookies, completion: @escaping (UsageResult) -> V
 // MARK: - Nyan Progress View
 
 class NyanProgressView: NSView {
-    var progress: CGFloat = 0
+    var progress: CGFloat? = nil
     var catFrames: [GIFFrame] = []
     var currentFrameIndex: Int = 0
     private var frameDurationAccumulator: TimeInterval = 0
@@ -276,7 +276,12 @@ class NyanProgressView: NSView {
 
         // At 0%, clip just the tail (left ~35% of the gif), not the whole cat
         let tailClip: CGFloat = catWidth * 0.35
-        let catX = progress * (bounds.width - catWidth + tailClip) - tailClip
+        let catX: CGFloat
+        if let progress = progress {
+            catX = progress * (bounds.width - catWidth + tailClip) - tailClip
+        } else {
+            catX = -catWidth * 0.5
+        }
         let catY: CGFloat = 0
 
         // Draw the rainbow trail by stretching the leftmost 1px column of the gif
@@ -287,7 +292,6 @@ class NyanProgressView: NSView {
             frame.image.draw(in: trailRect, from: sourceSlice, operation: .sourceOver, fraction: 1.0)
         }
 
-        // Draw the cat
         let catRect = NSRect(x: catX, y: catY, width: catWidth, height: catHeight)
         frame.image.draw(in: catRect, from: .zero, operation: .sourceOver, fraction: 1.0)
 
@@ -538,15 +542,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         usageTimer?.tolerance = 5
         RunLoop.current.add(usageTimer!, forMode: .common)
 
-        // Animation timer at ~30fps with tolerance for energy efficiency
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            if self.nyanView.advanceFrame() {
-                self.nyanView.needsDisplay = true
-            }
-        }
-        animationTimer?.tolerance = 0.005 // ~5ms tolerance lets macOS coalesce timer fires
-
         // Listen for distributed notifications to control flash
         DistributedNotificationCenter.default().addObserver(
             self, selector: #selector(handleFlashOn),
@@ -618,6 +613,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    func startAnimationIfNeeded() {
+        guard animationTimer == nil else { return }
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            if self.nyanView.advanceFrame() {
+                self.nyanView.needsDisplay = true
+            }
+        }
+        animationTimer?.tolerance = 0.005
+    }
+
     @objc func openLogin() {
         if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anthropic.claudefordesktop") {
             NSWorkspace.shared.openApplication(at: appURL, configuration: NSWorkspace.OpenConfiguration())
@@ -632,7 +638,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         sevenDayItem.view = makeMenuItemView("")
         sevenDayResetItem.view = makeMenuItemView("")
         loginItem.isHidden = !isAuthError
-        nyanView.progress = 0
+        nyanView.progress = nil
+        nyanView.currentFrameIndex = 0
+        nyanView.needsDisplay = true
+        animationTimer?.invalidate()
+        animationTimer = nil
     }
 
     @objc func refreshUsage() {
@@ -650,6 +660,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 case .success(let usage):
                     self.loginItem.isHidden = true
                     self.latestUsage = usage
+                    self.startAnimationIfNeeded()
 
                     // Update progress bar to show 5h utilization
                     let util = CGFloat(usage.fiveHour.utilization / 100.0)
