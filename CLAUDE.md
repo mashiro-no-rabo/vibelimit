@@ -66,7 +66,7 @@ README.md                                  # Build & launch setup docs
 - Menu shows notifications at the top: "Clear notifications" button followed by ❓ per session (project folder name)
 - Clicking the menu bar item dismisses flashing; new flash-on notifications resume it
 - Tracks `lastFlashTime` and `lastMenuClickTime` for dismiss/resume logic
-- `flash-notify.swift` helper reads session_id + cwd from hook JSON stdin and posts the distributed notification
+- `flash-notify.swift` helper reads session_id + cwd from hook JSON stdin, walks up from cwd to find the repo root (directory containing `.jj`), and posts the distributed notification with the repo folder name (falls back to cwd dirname if no `.jj` found)
 - Claude Code hooks:
   - Flash on: `Notification` (matchers: `permission_prompt`, `idle_prompt`)
   - Flash off: `Stop`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SessionEnd`
