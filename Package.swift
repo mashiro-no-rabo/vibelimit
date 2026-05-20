@@ -8,7 +8,6 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "VibeLimitApp",
-            resources: [.process("Resources")],
             linkerSettings: [.linkedLibrary("sqlite3")]
         )
     ]

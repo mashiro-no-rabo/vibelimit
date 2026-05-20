@@ -1,8 +1,8 @@
 # VibeLimitApp
 
-macOS menu bar app that shows Claude usage as a pikanyan nyan cat progress bar.
+macOS menu bar app that shows your Claude 5-hour session utilization as a percentage.
 
-The cat's position represents your 5-hour session utilization (0–100%), with a rainbow trail filling behind it. Click the menu bar item to see usage details and reset times.
+The menu bar title is padded to a consistent 4-character width (e.g. `  0%`, ` 37%`, `100%`) using monospaced digits and figure-space padding, so it doesn't jitter as the value changes. Click the menu bar item to see session/weekly usage bars and reset times.
 
 Requires **Claude Desktop** to be logged in — usage data is read via Claude Desktop's session cookies.
 
@@ -45,79 +45,3 @@ To stop:
 ```sh
 launchctl unload ~/Library/LaunchAgents/com.vibelimit.app.plist
 ```
-
-## Flash notification for Claude Code
-
-The menu bar flashes (pulsing white overlay) when Claude Code needs your attention. Each Claude session is tracked independently — the flash only stops when all sessions have cleared. Open the menu to see which sessions need attention (shown by project folder name), and use "Clear notifications" to dismiss all.
-
-Add these hooks to `~/.claude/settings.json` (adjust the path to `flash-notify.swift`):
-
-```json
-{
-  "hooks": {
-    "Notification": [
-      {
-        "matcher": "permission_prompt|idle_prompt",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "swift /path/to/vibelimit/flash-notify.swift on"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "swift /path/to/vibelimit/flash-notify.swift off"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "swift /path/to/vibelimit/flash-notify.swift off"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "swift /path/to/vibelimit/flash-notify.swift off"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "swift /path/to/vibelimit/flash-notify.swift off"
-          }
-        ]
-      }
-    ],
-    "PostToolUseFailure": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "swift /path/to/vibelimit/flash-notify.swift off"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-The `flash-notify.swift` script reads `session_id` and `cwd` from the hook's JSON stdin and passes them to the app via distributed notifications.
