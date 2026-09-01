@@ -1,15 +1,14 @@
 # VibeLimitApp
 
-macOS menu bar app that shows your Claude 5-hour session utilization as a text percentage.
+macOS menu bar app that shows your Claude 5-hour session headroom as a Japanese word.
 
 ## What it does
 
-- Displays the 5-hour session utilization (0–100%) as the menu bar title
-- Title uses a monospaced-digit font and is padded with U+2007 figure-space to a 4-char width (`  0%` … `100%`) so width is stable
+- Displays the 5-hour session headroom as a word: `余裕` (0–33% used), `半分` (34–66%), `間近` (67–89%), `限界` (90–100%)
 - Click the menu bar item to see: session/weekly usage % with ▰▱ progress bars, session resets in h/m, weekly resets in days
 - Usage refreshes every 60 seconds
 - Requires Claude Desktop to be logged in (reads its cookies for API access)
-- On auth errors, shows `--%` in the title and an "Open Claude Desktop to log in" menu item
+- On any error the title is a generic `Error`; the dropdown carries the detail, plus an "Open Claude Desktop to log in" item for auth errors
 
 ## Tech stack
 
@@ -30,9 +29,9 @@ README.md                                  # Build & launch setup docs
 
 ### Status bar title
 - `NSStatusItem` with `variableLength`
-- Title is an `NSAttributedString` using `NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)`
-- Percent is left-padded with U+2007 (figure space) to 3 digits + `%` → 4 characters total
-- Error states reuse the same 4-char width with short tokens (`auth`, `net!`, `429 `, `err!`, `--% `)
+- Title is an `NSAttributedString` using `NSFont.systemFont(ofSize: 13, weight: .regular)`
+- `headroomWord(percent:)` maps utilization to the word; exact percentages stay in the dropdown
+- All error states show `Error` (`…` before the first fetch); the specific cause goes in the dropdown
 
 ### Usage API
 - Endpoint: `GET https://claude.ai/api/organizations/{orgId}/usage`

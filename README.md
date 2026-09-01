@@ -1,8 +1,8 @@
 # VibeLimitApp
 
-macOS menu bar app that shows your Claude 5-hour session utilization as a percentage.
+macOS menu bar app that shows your Claude 5-hour session headroom as a Japanese word.
 
-The menu bar title is padded to a consistent 4-character width (e.g. `  0%`, ` 37%`, `100%`) using monospaced digits and figure-space padding, so it doesn't jitter as the value changes. Click the menu bar item to see session/weekly usage bars and reset times.
+The menu bar title is one of `余裕` (0–33% used), `半分` (34–66%), `間近` (67–89%), `限界` (90–100%). Click the menu bar item to see the exact session/weekly percentages with bars and reset times.
 
 Requires **Claude Desktop** to be logged in — usage data is read via Claude Desktop's session cookies.
 

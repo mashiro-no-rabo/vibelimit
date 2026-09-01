@@ -247,24 +247,27 @@ func formatDaysUntil(_ date: Date) -> String {
 
 // MARK: - Status Bar Title
 
-// Figure-space (U+2007) is a digit-width space in monospaced digit fonts —
-// keeps "  7%", " 42%", "100%" visually aligned.
-private let figureSpace = "\u{2007}"
+// Utilization is how much of the session budget is *used*, so the words
+// describe how much headroom is left. Two-kanji words keep the menu bar
+// width stable.
+func headroomWord(percent: Double) -> String {
+    let clamped = min(max(percent, 0), 100)
+    switch clamped {
+    case ..<34: return "余裕"
+    case ..<67: return "半分"
+    case ..<90: return "間近"
+    default: return "限界"
+    }
+}
 
 func statusBarTitle(percent: Double) -> NSAttributedString {
-    let clamped = Int(round(min(max(percent, 0), 100)))
-    let digits = String(clamped)
-    let padded = String(repeating: figureSpace, count: max(0, 3 - digits.count)) + digits + "%"
-    let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
-    return NSAttributedString(string: padded, attributes: [.font: font])
+    let font = NSFont.systemFont(ofSize: 13, weight: .regular)
+    return NSAttributedString(string: headroomWord(percent: percent), attributes: [.font: font])
 }
 
 func statusBarErrorTitle(_ text: String) -> NSAttributedString {
-    // Pad/truncate to 4 chars to match the percent display width
-    let trimmed = String(text.prefix(4))
-    let padded = trimmed + String(repeating: figureSpace, count: max(0, 4 - trimmed.count))
-    let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
-    return NSAttributedString(string: padded, attributes: [.font: font])
+    let font = NSFont.systemFont(ofSize: 13, weight: .regular)
+    return NSAttributedString(string: text, attributes: [.font: font])
 }
 
 // MARK: - App Delegate
@@ -287,7 +290,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.autosaveName = "!VibeLimitPercent"
 
-        statusItem.button?.attributedTitle = statusBarErrorTitle("--%")
+        statusItem.button?.attributedTitle = statusBarErrorTitle("…")
 
         // Build menu
         let menu = NSMenu()
@@ -354,8 +357,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func showError(_ message: String, titleText: String, isAuthError: Bool = false) {
-        statusItem.button?.attributedTitle = statusBarErrorTitle(titleText)
+    func showError(_ message: String, isAuthError: Bool = false) {
+        statusItem.button?.attributedTitle = statusBarErrorTitle("Error")
         fiveHourBarItem.view = makeMenuItemView(styledMenuTitle(message))
         fiveHourItem.view = makeMenuItemView("")
         fiveHourResetItem.view = makeMenuItemView("")
@@ -368,7 +371,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func refreshUsage() {
         // Read cookies from Claude Desktop's Chromium cookie store
         guard let cookies = readClaudeCookies() else {
-            showError("Open Claude Desktop", titleText: "--%", isAuthError: true)
+            showError("Open Claude Desktop", isAuthError: true)
             return
         }
 
@@ -392,16 +395,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self.sevenDayResetItem.view = makeMenuItemView("Resets in \(formatDaysUntil(usage.sevenDay.resetsAt))")
 
                 case .failure(.authError):
-                    self.showError("Run: claude login", titleText: "auth")
+                    self.showError("Run: claude login")
 
                 case .failure(.networkError):
-                    self.showError("Network error", titleText: "net!")
+                    self.showError("Network error")
 
                 case .failure(.rateLimited):
-                    self.showError("Rate limited", titleText: "429")
+                    self.showError("Rate limited")
 
                 case .failure(.parseError):
-                    self.showError("API error", titleText: "err!")
+                    self.showError("API error")
                 }
             }
         }
