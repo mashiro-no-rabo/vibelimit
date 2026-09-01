@@ -260,9 +260,24 @@ func headroomWord(percent: Double) -> String {
     }
 }
 
+// Faded while there is headroom, full contrast as it runs out. The label
+// colors are dynamic, so they follow the menu bar appearance.
+func headroomColor(percent: Double) -> NSColor {
+    let clamped = min(max(percent, 0), 100)
+    switch clamped {
+    case ..<34: return .tertiaryLabelColor
+    case ..<67: return .secondaryLabelColor
+    case ..<90: return .labelColor
+    default: return .systemRed
+    }
+}
+
 func statusBarTitle(percent: Double) -> NSAttributedString {
     let font = NSFont.systemFont(ofSize: 13, weight: .regular)
-    return NSAttributedString(string: headroomWord(percent: percent), attributes: [.font: font])
+    return NSAttributedString(
+        string: headroomWord(percent: percent),
+        attributes: [.font: font, .foregroundColor: headroomColor(percent: percent)]
+    )
 }
 
 func statusBarErrorTitle(_ text: String) -> NSAttributedString {
